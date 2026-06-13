@@ -342,7 +342,43 @@ async function main(): Promise<void> {
 	} else {
 		const app = express();
 		app.use(express.json());
+		
+// OAuth endpoints required by Claude MCP connector
+		const baseUrl = process.env.BASE_URL ?? `https://${process.env.FLY_APP_NAME ?? 'localhost'}.fly.dev`;
 
+		app.get('/.well-known/oauth-authorization-server', (_req: Request, res: Response) => {
+			res.json({
+				issuer: baseUrl,
+				authorization_endpoint: `${baseUrl}/authorize`,
+				token_endpoint: `${baseUrl}/token`,
+				registration_endpoint: `${baseUrl}/register`,
+				response_types_supported: ['code'],
+				grant_types_supported: ['authorization_code', 'client_credentials'],
+				token_endpoint_auth_methods_supported: ['none'],
+			});
+		});
+
+		app.post('/register', (_req: Request, res: Response) => {
+			res.status(201).json({
+				client_id: crypto.randomUUID(),
+				grant_types: ['authorization_code', 'client_credentials'],
+				response_types: ['code'],
+				token_endpoint_auth_method: 'none',
+			});
+		});
+
+		app.get('/authorize', (req: Request, res: Response) => {
+			const { redirect_uri, state } = req.query as Record<string, string>;
+			const redirectUrl = new URL(redirect_uri);
+			redirectUrl.searchParams.set('code', crypto.randomUUID());
+			if (state) redirectUrl.searchParams.set('state', state);
+			res.redirect(redirectUrl.toString());
+		});
+
+		app.post('/token', (_req: Request, res: Response) => {
+			res.json({ access_token: crypto.randomUUID(), token_type: 'Bearer', expires_in: 86400 });
+		});
+		
 		app.get('/callback', async (req: Request, res: Response) => {
 			const code = req.query.code as string | undefined;
 			if (!code) {
