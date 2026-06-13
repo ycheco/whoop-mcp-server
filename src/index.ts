@@ -375,7 +375,7 @@ async function main(): Promise<void> {
 				return;
 			}
 
-			if (req.method === 'POST') {
+			if (req.method === 'POST'|| req.method === 'GET') {
 				let transport: StreamableHTTPServerTransport;
 
 				if (sessionId && transports.has(sessionId)) {
